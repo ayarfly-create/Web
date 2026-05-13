@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>機種產能統計表</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .table-container {
+            overflow-x: auto;
+            max-height: 600px;
+        }
+        .sticky-header th {
+            position: sticky;
+            top: 0;
+            background: #1f2937;
+            z-index: 10;
+        }
+        .highlight-row:hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6">機種產能統計表</h1>
+        
+        <!-- 控制面板 -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">搜尋</label>
+                    <input type="text" id="searchInput" placeholder="搜尋機種或產線..."
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">機種篩選</label>
+                    <select id="modelFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部機種</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">產線篩選</label>
+                    <select id="lineFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部產線</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">排序</label>
+                    <select id="sortSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="none">預設排序</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- 統計卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-600 mb-1">總機種數</div>
+                <div id="totalModels" class="text-3xl font-bold text-blue-600">0</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-600 mb-1">總產線數</div>
+                <div id="totalLines" class="text-3xl font-bold text-green-600">0</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-600 mb-1">平均產能</div>
+                <div id="avgCapacity" class="text-3xl font-bold text-purple-600">0</div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="text-sm text-gray-600 mb-1">顯示筆數</div>
+                <div id="displayedRows" class="text-3xl font-bold text-orange-600">0</div>
+            </div>
+        </div>
+
+        <!-- 圖表區 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">產能分布圖</h2>
+                <canvas id="capacityChart"></canvas>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">機種統計</h2>
+                <canvas id="modelChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 資料表格 -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">詳細資料表</h2>
+            <div class="table-container">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="sticky-header">
+                        <tr id="tableHeader"></tr>
+                    </thead>
+                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 這裡需要實際的數據，請從 Excel 讀取後插入
+        let rawData = [];
+        let filteredData = [];
+        
+        // 初始化函數
+        function init() {
+            // 載入數據後執行
+            loadData();
+            populateFilters();
+            updateStatistics();
+            renderTable();
+            renderCharts();
+            
+            // 綁定事件
+            document.getElementById('searchInput').addEventListener('input', filterData);
+            document.getElementById('modelFilter').addEventListener('change', filterData);
+            document.getElementById('lineFilter').addEventListener('change', filterData);
+            document.getElementById('sortSelect').addEventListener('change', sortData);
+        }
+        
+        function loadData() {
+            // 數據將在這裡插入
+            rawData = []; // 從 Python 讀取的數據
+            filteredData = [...rawData];
+        }
+        
+        function populateFilters() {
+            // 填充篩選器選項
+        }
+        
+        function filterData() {
+            // 篩選邏輯
+        }
+        
+        function sortData() {
+            // 排序邏輯
+        }
+        
+        function updateStatistics() {
+            // 更新統計卡片
+        }
+        
+        function renderTable() {
+            // 渲染表格
+        }
+        
+        function renderCharts() {
+            // 渲染圖表
+        }
+        
+        // 頁面載入後初始化
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
