@@ -3,157 +3,777 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>機種產能統計表</title>
+    <title>APQP/PPAP 管理系統 - Dashboard</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        .table-container {
-            overflow-x: auto;
-            max-height: 600px;
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', sans-serif; }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .progress-ring { transform: rotate(-90deg); }
+        .badge { 
+            display: inline-flex; 
+            align-items: center; 
+            padding: 4px 12px; 
+            border-radius: 16px; 
+            font-size: 12px; 
+            font-weight: 600; 
         }
-        .sticky-header th {
-            position: sticky;
-            top: 0;
-            background: #1f2937;
-            z-index: 10;
+        .badge-pending { background: #fff3cd; color: #856404; }
+        .badge-inProgress { background: #cfe2ff; color: #084298; }
+        .badge-completed { background: #d1e7dd; color: #0f5132; }
+        .badge-overdue { background: #f8d7da; color: #842029; }
+        .project-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
-        .highlight-row:hover {
-            background-color: #f3f4f6;
+        .project-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+        .lang-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            padding-right: 28px;
         }
     </style>
 </head>
 <body class="bg-gray-50">
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6">機種產能統計表</h1>
-        
-        <!-- 控制面板 -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">搜尋</label>
-                    <input type="text" id="searchInput" placeholder="搜尋機種或產線..."
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">機種篩選</label>
-                    <select id="modelFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">全部機種</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">產線篩選</label>
-                    <select id="lineFilter" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">全部產線</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">排序</label>
-                    <select id="sortSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="none">預設排序</option>
-                    </select>
-                </div>
-            </div>
-        </div>
+    <div id="root"></div>
 
-        <!-- 統計卡片 -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="text-sm text-gray-600 mb-1">總機種數</div>
-                <div id="totalModels" class="text-3xl font-bold text-blue-600">0</div>
-            </div>
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="text-sm text-gray-600 mb-1">總產線數</div>
-                <div id="totalLines" class="text-3xl font-bold text-green-600">0</div>
-            </div>
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="text-sm text-gray-600 mb-1">平均產能</div>
-                <div id="avgCapacity" class="text-3xl font-bold text-purple-600">0</div>
-            </div>
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <div class="text-sm text-gray-600 mb-1">顯示筆數</div>
-                <div id="displayedRows" class="text-3xl font-bold text-orange-600">0</div>
-            </div>
-        </div>
+    <script type="text/babel">
+        const { useState, createContext, useContext } = React;
 
-        <!-- 圖表區 -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">產能分布圖</h2>
-                <canvas id="capacityChart"></canvas>
-            </div>
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">機種統計</h2>
-                <canvas id="modelChart"></canvas>
-            </div>
-        </div>
+        // ==================== 多語系配置 ====================
+        const translations = {
+            zh: {
+                // 系統基本
+                appTitle: "APQP/PPAP 文件管理系統",
+                subtitle: "金屬精密沖壓業 - APQP 3rd Edition",
+                login: "登入系統",
+                logout: "登出",
+                welcome: "歡迎回來",
+                
+                // 導航
+                dashboard: "專案總覽",
+                projects: "所有專案",
+                equipment: "設備管理",
+                users: "使用者管理",
+                settings: "系統設定",
+                
+                // 角色與部門
+                admin: "管理員",
+                manager: "主管",
+                member: "組員",
+                guest: "訪客",
+                sales: "業務部",
+                engineering: "工程部",
+                quality: "品保部",
+                production: "生產部",
+                
+                // 專案相關
+                projectName: "專案名稱",
+                partName: "零件名稱",
+                partNumber: "零件編號",
+                revision: "版次",
+                material: "材料",
+                location: "製造地點",
+                stage: "當前階段",
+                progress: "完成進度",
+                status: "狀態",
+                
+                // 狀態標籤
+                pending: "待處理",
+                inProgress: "進行中",
+                completed: "已完成",
+                overdue: "逾期",
+                
+                // 操作
+                newProject: "新建專案",
+                viewDetail: "查看詳情",
+                edit: "編輯",
+                delete: "刪除",
+                search: "搜尋專案...",
+                filter: "篩選",
+                export: "匯出",
+                
+                // 統計
+                totalProjects: "專案總數",
+                activeProjects: "進行中",
+                completedProjects: "已完成",
+                overdueProjects: "逾期項目",
+                
+                // 其他
+                selectLanguage: "選擇語言",
+                selectRole: "選擇角色",
+                username: "使用者名稱",
+                enterUsername: "請輸入您的名稱",
+            },
+            en: {
+                appTitle: "APQP/PPAP Management System",
+                subtitle: "Metal Stamping - APQP 3rd Edition",
+                login: "Login",
+                logout: "Logout",
+                welcome: "Welcome back",
+                
+                dashboard: "Dashboard",
+                projects: "Projects",
+                equipment: "Equipment",
+                users: "Users",
+                settings: "Settings",
+                
+                admin: "Admin",
+                manager: "Manager",
+                member: "Member",
+                guest: "Guest",
+                sales: "Sales",
+                engineering: "Engineering",
+                quality: "Quality",
+                production: "Production",
+                
+                projectName: "Project Name",
+                partName: "Part Name",
+                partNumber: "Part Number",
+                revision: "Revision",
+                material: "Material",
+                location: "Location",
+                stage: "Stage",
+                progress: "Progress",
+                status: "Status",
+                
+                pending: "Pending",
+                inProgress: "In Progress",
+                completed: "Completed",
+                overdue: "Overdue",
+                
+                newProject: "New Project",
+                viewDetail: "View Details",
+                edit: "Edit",
+                delete: "Delete",
+                search: "Search projects...",
+                filter: "Filter",
+                export: "Export",
+                
+                totalProjects: "Total Projects",
+                activeProjects: "Active",
+                completedProjects: "Completed",
+                overdueProjects: "Overdue",
+                
+                selectLanguage: "Language",
+                selectRole: "Select Role",
+                username: "Username",
+                enterUsername: "Enter your name",
+            },
+            th: {
+                appTitle: "ระบบจัดการ APQP/PPAP",
+                subtitle: "โลหะปั๊มเจาะ - APQP รุ่นที่ 3",
+                login: "เข้าสู่ระบบ",
+                logout: "ออกจากระบบ",
+                welcome: "ยินดีต้อนรับกลับ",
+                
+                dashboard: "แดชบอร์ด",
+                projects: "โครงการ",
+                equipment: "อุปกรณ์",
+                users: "ผู้ใช้",
+                settings: "การตั้งค่า",
+                
+                admin: "ผู้ดูแลระบบ",
+                manager: "ผู้จัดการ",
+                member: "สมาชิก",
+                guest: "ผู้เยี่ยมชม",
+                sales: "ฝ่ายขาย",
+                engineering: "วิศวกรรม",
+                quality: "คุณภาพ",
+                production: "การผลิต",
+                
+                projectName: "ชื่อโครงการ",
+                partName: "ชื่อชิ้นส่วน",
+                partNumber: "รหัสชิ้นส่วน",
+                revision: "แก้ไขครั้งที่",
+                material: "วัสดุ",
+                location: "สถานที่ผลิต",
+                stage: "ขั้นตอน",
+                progress: "ความคืบหน้า",
+                status: "สถานะ",
+                
+                pending: "รอดำเนินการ",
+                inProgress: "กำลังดำเนินการ",
+                completed: "เสร็จสิ้น",
+                overdue: "เกินกำหนด",
+                
+                newProject: "โครงการใหม่",
+                viewDetail: "ดูรายละเอียด",
+                edit: "แก้ไข",
+                delete: "ลบ",
+                search: "ค้นหาโครงการ...",
+                filter: "กรอง",
+                export: "ส่งออก",
+                
+                totalProjects: "โครงการทั้งหมด",
+                activeProjects: "กำลังดำเนินการ",
+                completedProjects: "เสร็จสิ้น",
+                overdueProjects: "เกินกำหนด",
+                
+                selectLanguage: "เลือกภาษา",
+                selectRole: "เลือกบทบาท",
+                username: "ชื่อผู้ใช้",
+                enterUsername: "กรอกชื่อของคุณ",
+            }
+        };
 
-        <!-- 資料表格 -->
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">詳細資料表</h2>
-            <div class="table-container">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="sticky-header">
-                        <tr id="tableHeader"></tr>
-                    </thead>
-                    <tbody id="tableBody" class="bg-white divide-y divide-gray-200"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+        // ==================== Context ====================
+        const AppContext = createContext();
 
-    <script>
-        // 這裡需要實際的數據，請從 Excel 讀取後插入
-        let rawData = [];
-        let filteredData = [];
-        
-        // 初始化函數
-        function init() {
-            // 載入數據後執行
-            loadData();
-            populateFilters();
-            updateStatistics();
-            renderTable();
-            renderCharts();
-            
-            // 綁定事件
-            document.getElementById('searchInput').addEventListener('input', filterData);
-            document.getElementById('modelFilter').addEventListener('change', filterData);
-            document.getElementById('lineFilter').addEventListener('change', filterData);
-            document.getElementById('sortSelect').addEventListener('change', sortData);
-        }
-        
-        function loadData() {
-            // 數據將在這裡插入
-            rawData = []; // 從 Python 讀取的數據
-            filteredData = [...rawData];
-        }
-        
-        function populateFilters() {
-            // 填充篩選器選項
-        }
-        
-        function filterData() {
+        // ==================== 模擬專案數據 ====================
+        const mockProjects = [
+            {
+                id: 1,
+                partName: "精密沖壓件A",
+                partNumber: "P/N-12345678",
+                revision: "Rev. 03",
+                material: "SUS304",
+                location: "精密沖壓 A 線",
+                stage: 3,
+                totalStages: 5,
+                progress: 65,
+                status: "inProgress",
+                equipment: ["200T沖床-A01", "OMM-M02"],
+                createdDate: "2024-01-15",
+                dueDate: "2024-06-30",
+                responsible: "engineering",
+                apqpCompleted: 12,
+                apqpTotal: 15,
+                ppapCompleted: 8,
+                ppapTotal: 18,
+            },
+            {
+                id: 2,
+                partName: "精密沖壓件B",
+                partNumber: "P/N-87654321",
+                revision: "Rev. 01",
+                material: "C5191",
+                location: "精密沖壓 B 線",
+                stage: 1,
+                totalStages: 5,
+                progress: 20,
+                status: "pending",
+                equipment: ["200T沖床-B02"],
+                createdDate: "2024-05-10",
+                dueDate: "2024-12-31",
+                responsible: "quality",
+                apqpCompleted: 3,
+                apqpTotal: 15,
+                ppapCompleted: 0,
+                ppapTotal: 18,
+            },
+            {
+                id: 3,
+                partName: "連接器外殼",
+                partNumber: "P/N-11223344",
+                revision: "Rev. 02",
+                material: "SUS304",
+                location: "精密沖壓 A 線",
+                stage: 5,
+                totalStages: 5,
+                progress: 95,
+                status: "completed",
+                equipment: ["200T沖床-A01"],
+                createdDate: "2023-11-20",
+                dueDate: "2024-04-30",
+                responsible: "sales",
+                apqpCompleted: 15,
+                apqpTotal: 15,
+                ppapCompleted: 18,
+                ppapTotal: 18,
+            },
+            {
+                id: 4,
+                partName: "電子支架",
+                partNumber: "P/N-55667788",
+                revision: "Rev. 04",
+                material: "C5191",
+                location: "精密沖壓 B 線",
+                stage: 4,
+                totalStages: 5,
+                progress: 45,
+                status: "overdue",
+                equipment: ["200T沖床-B02", "OMM-M03"],
+                createdDate: "2024-02-01",
+                dueDate: "2024-05-15",
+                responsible: "engineering",
+                apqpCompleted: 10,
+                apqpTotal: 15,
+                ppapCompleted: 6,
+                ppapTotal: 18,
+            },
+        ];
+
+        // ==================== 主應用 ====================
+        function App() {
+            const [language, setLanguage] = useState('zh');
+            const [currentUser, setCurrentUser] = useState(null);
+            const [projects, setProjects] = useState(mockProjects);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [filterStatus, setFilterStatus] = useState('all');
+
+            const t = (key) => translations[language][key] || key;
+
             // 篩選邏輯
+            const filteredProjects = projects.filter(project => {
+                const matchSearch = project.partName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                   project.partNumber.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchStatus = filterStatus === 'all' || project.status === filterStatus;
+                return matchSearch && matchStatus;
+            });
+
+            if (!currentUser) {
+                return <LoginPage setCurrentUser={setCurrentUser} t={t} language={language} setLanguage={setLanguage} />;
+            }
+
+            return (
+                <AppContext.Provider value={{ t, language, setLanguage, currentUser, projects, setProjects }}>
+                    <div className="min-h-screen bg-gray-50">
+                        <Navbar setCurrentUser={setCurrentUser} />
+                        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                            <Dashboard 
+                                filteredProjects={filteredProjects}
+                                searchTerm={searchTerm}
+                                setSearchTerm={setSearchTerm}
+                                filterStatus={filterStatus}
+                                setFilterStatus={setFilterStatus}
+                            />
+                        </main>
+                    </div>
+                </AppContext.Provider>
+            );
         }
-        
-        function sortData() {
-            // 排序邏輯
+
+        // ==================== 登入頁面 ====================
+        function LoginPage({ setCurrentUser, t, language, setLanguage }) {
+            const [username, setUsername] = useState('');
+            const [selectedRole, setSelectedRole] = useState('admin');
+
+            const handleLogin = () => {
+                if (username.trim()) {
+                    const deptMap = {
+                        admin: 'management',
+                        manager: 'engineering',
+                        member: 'quality',
+                        guest: 'sales'
+                    };
+                    setCurrentUser({ 
+                        username: username.trim(), 
+                        role: selectedRole,
+                        department: deptMap[selectedRole]
+                    });
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-600 via-blue-500 to-purple-600 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+                        {/* Logo 區域 */}
+                        <div className="text-center mb-8">
+                            <div className="w-20 h-20 bg-blue-600 rounded-2xl mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
+                                AP
+                            </div>
+                            <h1 className="text-2xl font-bold text-gray-800 mb-1">{t('appTitle')}</h1>
+                            <p className="text-sm text-gray-600">{t('subtitle')}</p>
+                        </div>
+
+                        {/* 語言選擇 */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                🌐 {t('selectLanguage')}
+                            </label>
+                            <select 
+                                value={language} 
+                                onChange={(e) => setLanguage(e.target.value)}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none lang-select transition"
+                            >
+                                <option value="zh">🇹🇼 繁體中文</option>
+                                <option value="en">🇺🇸 English</option>
+                                <option value="th">🇹🇭 ภาษาไทย</option>
+                            </select>
+                        </div>
+
+                        {/* 使用者名稱輸入 */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                👤 {t('username')}
+                            </label>
+                            <input
+                                type="text"
+                                placeholder={t('enterUsername')}
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                            />
+                        </div>
+
+                        {/* 角色選擇 */}
+                        <div className="mb-6">
+                            <label className="block text-sm font-semibold text-gray-700 mb-3">
+                                🎭 {t('selectRole')}
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                                {['admin', 'manager', 'member', 'guest'].map(role => (
+                                    <button
+                                        key={role}
+                                        onClick={() => setSelectedRole(role)}
+                                        className={`px-4 py-3 rounded-xl font-semibold transition-all ${
+                                            selectedRole === role 
+                                                ? 'bg-blue-600 text-white shadow-lg scale-105' 
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {t(role)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 登入按鈕 */}
+                        <button
+                            onClick={handleLogin}
+                            disabled={!username.trim()}
+                            className={`w-full py-4 rounded-xl font-bold text-white text-lg transition-all ${
+                                username.trim() 
+                                    ? 'bg-blue-600 hover:bg-blue-700 shadow-lg hover:shadow-xl' 
+                                    : 'bg-gray-300 cursor-not-allowed'
+                            }`}
+                        >
+                            {t('login')} →
+                        </button>
+
+                        {/* Demo 提示 */}
+                        <div className="mt-6 p-4 bg-gray-50 rounded-xl text-center text-sm text-gray-600">
+                            <p className="font-semibold mb-1">Demo Account</p>
+                            <p>輸入任意名稱即可登入測試</p>
+                        </div>
+                    </div>
+                </div>
+            );
         }
-        
-        function updateStatistics() {
-            // 更新統計卡片
+
+        // ==================== 導航欄 ====================
+        function Navbar({ setCurrentUser }) {
+            const { t, language, setLanguage, currentUser } = useContext(AppContext);
+
+            return (
+                <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex justify-between items-center h-16">
+                            {/* Logo & Title */}
+                            <div className="flex items-center space-x-4">
+                                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
+                                    AP
+                                </div>
+                                <div>
+                                    <h1 className="text-lg font-bold text-gray-800">{t('appTitle')}</h1>
+                                    <p className="text-xs text-gray-500">APQP 3rd Edition</p>
+                                </div>
+                            </div>
+
+                            {/* 右側功能區 */}
+                            <div className="flex items-center space-x-4">
+                                {/* 語言切換 */}
+                                <select 
+                                    value={language} 
+                                    onChange={(e) => setLanguage(e.target.value)}
+                                    className="px-3 py-2 border border-gray-300 rounded-lg text-sm lang-select focus:outline-none focus:border-blue-500"
+                                >
+                                    <option value="zh">中文</option>
+                                    <option value="en">EN</option>
+                                    <option value="th">TH</option>
+                                </select>
+
+                                {/* 使用者資訊 */}
+                                <div className="flex items-center space-x-3 pl-4 border-l border-gray-300">
+                                    <div className="text-right">
+                                        <div className="text-sm font-semibold text-gray-800">{currentUser.username}</div>
+                                        <div className="text-xs text-gray-500">{t(currentUser.role)} · {t(currentUser.department)}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => setCurrentUser(null)}
+                                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition font-medium text-sm"
+                                    >
+                                        {t('logout')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            );
         }
-        
-        function renderTable() {
-            // 渲染表格
+
+        // ==================== Dashboard 主頁 ====================
+        function Dashboard({ filteredProjects, searchTerm, setSearchTerm, filterStatus, setFilterStatus }) {
+            const { t, projects } = useContext(AppContext);
+
+            // 統計數據
+            const stats = {
+                total: projects.length,
+                active: projects.filter(p => p.status === 'inProgress').length,
+                completed: projects.filter(p => p.status === 'completed').length,
+                overdue: projects.filter(p => p.status === 'overdue').length,
+            };
+
+            return (
+                <div className="space-y-8 fade-in">
+                    {/* 頁面標題 */}
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h2 className="text-3xl font-bold text-gray-800">{t('dashboard')}</h2>
+                            <p className="text-gray-600 mt-1">總覽所有專案的進度與狀態</p>
+                        </div>
+                        <button className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition shadow-lg hover:shadow-xl">
+                            + {t('newProject')}
+                        </button>
+                    </div>
+
+                    {/* 統計卡片 */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <StatCard 
+                            title={t('totalProjects')}
+                            value={stats.total}
+                            icon="📊"
+                            color="blue"
+                        />
+                        <StatCard 
+                            title={t('activeProjects')}
+                            value={stats.active}
+                            icon="🔄"
+                            color="blue"
+                        />
+                        <StatCard 
+                            title={t('completedProjects')}
+                            value={stats.completed}
+                            icon="✅"
+                            color="green"
+                        />
+                        <StatCard 
+                            title={t('overdueProjects')}
+                            value={stats.overdue}
+                            icon="⚠️"
+                            color="red"
+                        />
+                    </div>
+
+                    {/* 搜尋與篩選 */}
+                    <div className="bg-white rounded-xl shadow-md p-6">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            {/* 搜尋框 */}
+                            <div className="flex-1">
+                                <input
+                                    type="text"
+                                    placeholder={t('search')}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none transition"
+                                />
+                            </div>
+
+                            {/* 狀態篩選 */}
+                            <div className="flex gap-2">
+                                {['all', 'pending', 'inProgress', 'completed', 'overdue'].map(status => (
+                                    <button
+                                        key={status}
+                                        onClick={() => setFilterStatus(status)}
+                                        className={`px-4 py-3 rounded-xl font-medium transition ${
+                                            filterStatus === status
+                                                ? 'bg-blue-600 text-white shadow-lg'
+                                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                        }`}
+                                    >
+                                        {status === 'all' ? '全部' : t(status)}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 專案列表 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredProjects.map(project => (
+                            <ProjectCard key={project.id} project={project} />
+                        ))}
+                    </div>
+
+                    {/* 空狀態 */}
+                    {filteredProjects.length === 0 && (
+                        <div className="text-center py-16">
+                            <div className="text-6xl mb-4">🔍</div>
+                            <h3 className="text-xl font-semibold text-gray-800 mb-2">找不到符合的專案</h3>
+                            <p className="text-gray-600">請嘗試調整搜尋條件或篩選器</p>
+                        </div>
+                    )}
+                </div>
+            );
         }
-        
-        function renderCharts() {
-            // 渲染圖表
+
+        // ==================== 統計卡片 ====================
+        function StatCard({ title, value, icon, color }) {
+            const colorClasses = {
+                blue: 'from-blue-500 to-blue-600',
+                green: 'from-green-500 to-green-600',
+                red: 'from-red-500 to-red-600',
+                orange: 'from-orange-500 to-orange-600',
+            };
+
+            return (
+                <div className={`bg-gradient-to-br ${colorClasses[color]} rounded-xl shadow-lg p-6 text-white`}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-white/80 text-sm font-medium mb-1">{title}</p>
+                            <p className="text-4xl font-bold">{value}</p>
+                        </div>
+                        <div className="text-4xl opacity-80">{icon}</div>
+                    </div>
+                </div>
+            );
         }
-        
-        // 頁面載入後初始化
-        window.addEventListener('DOMContentLoaded', init);
+
+        // ==================== 專案卡片 ====================
+        function ProjectCard({ project }) {
+            const { t } = useContext(AppContext);
+
+            const statusConfig = {
+                pending: { label: t('pending'), className: 'badge-pending' },
+                inProgress: { label: t('inProgress'), className: 'badge-inProgress' },
+                completed: { label: t('completed'), className: 'badge-completed' },
+                overdue: { label: t('overdue'), className: 'badge-overdue' },
+            };
+
+            const status = statusConfig[project.status];
+
+            return (
+                <div className="project-card bg-white rounded-xl shadow-md overflow-hidden">
+                    {/* 卡片頭部 */}
+                    <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-white">
+                        <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg mb-1 line-clamp-1">{project.partName}</h3>
+                                <p className="text-sm text-white/90">{project.partNumber}</p>
+                            </div>
+                            <span className={`badge ${status.className}`}>{status.label}</span>
+                        </div>
+                    </div>
+
+                    {/* 卡片內容 */}
+                    <div className="p-5">
+                        {/* 進度環形圖 */}
+                        <div className="flex items-center justify-center mb-4">
+                            <ProgressRing progress={project.progress} size={100} />
+                        </div>
+
+                        {/* 階段指示器 */}
+                        <div className="mb-4">
+                            <div className="flex justify-between text-xs text-gray-600 mb-2">
+                                <span>{t('stage')}</span>
+                                <span className="font-semibold">{project.stage} / {project.totalStages}</span>
+                            </div>
+                            <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map(stage => (
+                                    <div 
+                                        key={stage}
+                                        className={`h-2 flex-1 rounded-full ${
+                                            stage <= project.stage ? 'bg-blue-500' : 'bg-gray-200'
+                                        }`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 詳細資訊 */}
+                        <div className="space-y-2 text-sm mb-4">
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">{t('revision')}:</span>
+                                <span className="font-semibold">{project.revision}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">{t('material')}:</span>
+                                <span className="font-semibold">{project.material}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">APQP:</span>
+                                <span className="font-semibold text-blue-600">{project.apqpCompleted}/{project.apqpTotal}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-600">PPAP:</span>
+                                <span className="font-semibold text-blue-600">{project.ppapCompleted}/{project.ppapTotal}</span>
+                            </div>
+                        </div>
+
+                        {/* 設備標籤 */}
+                        <div className="flex flex-wrap gap-2 mb-4">
+                            {project.equipment.map((eq, i) => (
+                                <span key={i} className="text-xs bg-gray-100 px-3 py-1 rounded-full text-gray-700">
+                                    {eq}
+                                </span>
+                            ))}
+                        </div>
+
+                        {/* 操作按鈕 */}
+                        <button className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition">
+                            {t('viewDetail')} →
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==================== 進度環形圖 ====================
+        function ProgressRing({ progress, size = 120 }) {
+            const strokeWidth = 8;
+            const radius = (size - strokeWidth) / 2;
+            const circumference = 2 * Math.PI * radius;
+            const offset = circumference - (progress / 100) * circumference;
+
+            return (
+                <div className="relative" style={{ width: size, height: size }}>
+                    <svg className="progress-ring" width={size} height={size}>
+                        {/* 背景圓環 */}
+                        <circle
+                            cx={size / 2}
+                            cy={size / 2}
+                            r={radius}
+                            stroke="#e5e7eb"
+                            strokeWidth={strokeWidth}
+                            fill="none"
+                        />
+                        {/* 進度圓環 */}
+                        <circle
+                            cx={size / 2}
+                            cy={size / 2}
+                            r={radius}
+                            stroke="#3b82f6"
+                            strokeWidth={strokeWidth}
+                            fill="none"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={offset}
+                            strokeLinecap="round"
+                            style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                        />
+                    </svg>
+                    {/* 中間文字 */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-3xl font-bold text-gray-800">{progress}%</span>
+                        <span className="text-xs text-gray-500">完成度</span>
+                    </div>
+                </div>
+            );
+        }
+
+        // ==================== 啟動應用 ====================
+        ReactDOM.render(<App />, document.getElementById('root'));
     </script>
 </body>
 </html>
