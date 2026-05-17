@@ -1,4 +1,4 @@
-# Web
+# Web code frome Gemini.AI
 stamping-apqp-ppap-system/
 ├── public/              # 靜態資源 (圖標、簽名檔範本)
 ├── src/
